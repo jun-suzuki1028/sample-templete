@@ -1,6 +1,6 @@
 ###### tags: `AWS` `SQS` `SNS` `VPC` `EC2` `RDS`
  
-# classmethod作業手順書
+# 作業手順書
 
 ## 実行環境
 * Windows 10 Home
@@ -11,7 +11,6 @@
 ```
 .
 ├── 作業手順書.md　#
-├── 作業手順書.html
 └── task
     ├── 01_network.bat
     ├── 02_security.bat
@@ -44,11 +43,10 @@
 
 ## 作業手順
 1. IAMユーザー作成
-2. Cloudformationによるインフラ構築(課題1)
-3. 動作確認(課題1)
-4. Cloudformationによるインフラ構築(課題2)
-5. CPU使用率出力用スクリプト作成/実行(課題2)
-6. CPU使用率取得用スクリプト作成/実行(課題2)
+2. Cloudformationによるインフラ構築
+3. 動作確認
+4. CPU使用率出力用スクリプト作成/実行
+5. CPU使用率取得用スクリプト作成/実行
 
 ### 1. IAMユーザー作成
 
@@ -63,7 +61,7 @@
 
 
 
-### 2. Cloudformationによるインフラ構築(課題1)
+### 2. Cloudformationによるインフラ構築
 
 Cloudformationの実行はパラメーターの入力を簡単にするため、AWS CLIのコマンドをbatファイル化。
 
@@ -189,12 +187,7 @@ catch (Exception $e)
 
 ***
 
-### 4 Cloudformationによるインフラ構築(課題2)
-
-AWS SQS,AWS SNSをCloudformationで作成。
-課題1で実行した`03_web.bat`でSNS,SQS作成済みのためスキップ。
-
-### 5. CPU使用率出力用スクリプト作成/実行(課題2)
+### 4. CPU使用率出力用スクリプト作成/実行
 
 AWS SNSに対して、CPU使用率を送付するためのシェルスクリプトを作成、実行する。
 
@@ -259,7 +252,7 @@ done
 ```
 
 
-### 6. CPU使用率確認用シェルスクリプト作成/実行(課題2)
+### 5. CPU使用率確認用シェルスクリプト作成/実行
 
 
 AWS SNSに対して、CPU使用率を送付するためのシェルスクリプトを作成、実行する。
