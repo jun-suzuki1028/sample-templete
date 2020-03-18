@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+  SystemName:
+    Type: String
+    Default: web
+    AllowedPattern: ^web$
+  NetworkStack:
+    Type: String
+    Default: NetworkStack
+  SecurityStack:
+    Type: String
+    Default: SecurityStack
+  ImageId :
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+  InstanceType:
+    Type: String
+    Default: t2.micro
+  SnsEmail:
+    Type: String
+    AllowedPattern: '[^\s]+@[^\s]+'
+    Default: calc.9029@gmail.com
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Metadata
+        Parameters:
+          - Env
+          - SystemName
+      - Label:
+          default: Dependent Stacks
+        Parameters:
+          - NetworkStack
+          - SecurityStack
+Resources:
+  # LoadBalancer
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${SystemName}-${Env}-alb
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PublicSubnetAZ1
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PublicSubnetAZ2
+      SecurityGroups:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgAlb
+  ## Listener
+  AlbListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref Tg
+  # Target Group
+  Tg:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${SystemName}-${Env}-tg
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      Targets:
+        - Id: !Ref InstanceAZ1
+        - Id: !Ref InstanceAZ2
+  # Instance
+  InstanceAZ1:
+    Type: AWS::EC2::Instance
+    Properties:
+      IamInstanceProfile:  
+        Fn::ImportValue: 
+          !Sub ${SecurityStack}-ProfileInstance
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SubnetId:
+        Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ1
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgInstance
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-instance-az1
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y update
+          yum -y install httpd
+          yum install -y mysql
+          yum install -y jq
+          yum -y install php php-mysql
+          service httpd start
+          chkconfig httpd on
+
+  InstanceAZ2:
+    Type: AWS::EC2::Instance
+    Properties:
+      IamInstanceProfile: 
+        Fn::ImportValue: 
+          !Sub ${SecurityStack}-ProfileInstance
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SubnetId:
+        Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ2
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgInstance
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-instance-az2
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y update
+          yum -y install httpd
+          yum install -y mysql
+          yum install -y jq
+          yum -y install php php-mysql
+          service httpd start
+          chkconfig httpd on
+
+  ## SNS
+  SnsTopic: 
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${SystemName}-${Env}-cpu-topic
+      TopicName: !Sub ${SystemName}-${Env}-cpu-topic
+        
+  SubscriptionEmail: 
+    DependsOn: SnsTopic
+    Type: AWS::SNS::Subscription
+    Properties: 
+      Endpoint: !Ref SnsEmail
+      TopicArn: !Ref SnsTopic
+      Protocol: email 
+
+  SubscriptionSqs:
+    DependsOn: SnsTopic
+    Type: AWS::SNS::Subscription
+    Properties: 
+      Endpoint: !GetAtt SqsQueue.Arn
+      TopicArn: !Ref SnsTopic
+      Protocol: sqs 
+
+  ## SQS
+  SqsQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: !Sub ${SystemName}-${Env}-cpu-queue
+
+  QueuePolycy:
+    DependsOn: SqsQueue
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Id: AllowSnsTopicToSendMessage
+        Statement:
+          - Sid: 1
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - sqs:SendMessage
+            Resource: "*"
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  !Ref SnsTopic
+      Queues:
+        - !Ref SqsQueue

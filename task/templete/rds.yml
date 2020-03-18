@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+  SystemName:
+    Type: String
+    Default: rds
+    AllowedPattern: ^rds$
+  NetworkStack:
+    Type: String
+    Default: NetworkStack
+  SecurityStack:
+    Type: String
+    Default: SecurityStack
+  DBInstanceClass:
+    Type: String
+    Default: db.t2.small
+  DBName:
+    Type: String
+    Default: "db"
+  DBMasterUserName:
+    Type: String
+    Default: "dbuser"
+    NoEcho: true
+    MinLength: 1
+    MaxLength: 16
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: "must begin with a letter and contain only alphanumeric characters."
+  DBPassword: 
+    Default: "dbpassword"
+    NoEcho: true
+    Type: String
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: "must contain only alphanumeric characters."
+  MultiAZ: 
+    Default: "false"
+    Type: String
+    AllowedValues: [ "true", "false" ]
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Metadata
+        Parameters:
+          - Env
+          - SystemName
+      - Label:
+          default: Dependent Stacks
+        Parameters:
+          - NetworkStack
+          - SecurityStack
+
+Resources:
+  # RDS
+  ## DBSubnetGroup
+  DBSubnetGroup: 
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: description
+      DBSubnetGroupName: db-subnetGroup
+      SubnetIds: 
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ1
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ2
+      Tags: 
+        - Key: Name
+          Value: !Sub  ${SystemName}-${Env}-dbsubnetgroup
+  ## DBInstance
+  DBInstance: 
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      AllocatedStorage: 5
+      DBInstanceClass: !Ref DBInstanceClass
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      MultiAZ: !Ref MultiAZ
+      Engine: MySQL
+      MasterUsername: !Ref DBMasterUserName
+      MasterUserPassword: !Ref DBPassword
+      EnablePerformanceInsights: false
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub ${SecurityStack}-SgRds
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${Env}-rds

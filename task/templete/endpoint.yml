@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+  SystemName:
+    Type: String
+    Default: endpoint
+    AllowedPattern: ^endpoint$
+  NetworkStack:
+    Type: String
+    Default: NetworkStack
+  SecurityStack:
+    Type: String
+    Default: SecurityStack
+
+Resources:
+# ssm End Point
+  EndpointSsm:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgEndpoint
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .ssm
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ1
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ2
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+
+# ec2messages End Point
+  EndpointEc2messages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgEndpoint
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .ec2messages
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ1
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ2
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+
+# ssmmessages End Point
+  EndpointSsmmessages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgEndpoint
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .ssmmessages
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ1
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ2
+      VpcId:         
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+
+# sns End Point
+  EndpointSns:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgEndpoint
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .sns
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ1
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ2
+      VpcId:         
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+# SQS End Point
+  EndpointSqs:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub ${SecurityStack}-SgEndpoint
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .sqs
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ1
+        - Fn::ImportValue:
+            !Sub ${NetworkStack}-PrivateSubnetAZ2
+      VpcId:         
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true

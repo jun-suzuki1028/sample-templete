@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+  SystemName:
+    Type: String
+    Default: security
+    AllowedPattern: ^security$
+  NetworkStack:
+    Type: String
+    Default: NetworkStack
+  AlbCidr:
+    Type: String
+    AllowedPattern: ^(([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])/([1-2]?[0-9]|3[0-2])$
+    Default: 0.0.0.0/0
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Metadata
+        Parameters:
+          - Env
+          - SystemName
+      - Label:
+          default: Dependent Stacks
+        Parameters:
+          - NetworkStack
+
+Resources:
+  # Security Group
+  ## LoadBalancer
+  SgAlb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${SystemName}-${Env}-alb-sg
+      GroupDescription: !Sub ${SystemName}-${Env}-alb-sg
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AlbCidr
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AlbCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-alb-sg
+  ## Instance
+  SgInstance:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${SystemName}-${Env}-instance-sg
+      GroupDescription: !Sub ${SystemName}-${Env}-instance-sg
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref SgAlb
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref SgAlb
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-instance-sg
+
+  ## Endpoint
+  SgEndpoint:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${SystemName}-${Env}-endpoint-sg
+      GroupDescription: !Sub ${SystemName}-${Env}-endpoint-sg
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 
+            Fn::ImportValue:
+              !Sub ${NetworkStack}-VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-endpoint-sg
+  SgRds:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${SystemName}-${Env}-rds-sg
+      GroupDescription: !Sub ${SystemName}-${Env}-rds-sg
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${NetworkStack}-Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref SgInstance
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-rds-sg
+
+  RoleInstance:  
+    Type: AWS::IAM::Role
+    Properties: 
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/PowerUserAccess 
+      AssumeRolePolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - 
+            Effect: Allow
+            Principal: 
+              Service: 
+                - ec2.amazonaws.com
+            Action: 
+              - sts:AssumeRole
+      Path: /
+#  PolicyInstance:  
+#    Type: AWS::IAM::Policy  
+#    Properties:  
+#      PolicyName: PowerUserAccess
+#      PolicyDocument:  
+#        Version: 2012-10-17
+#        Statement: 
+#        - Effect: "Allow"
+#          Action: "*"
+#          Resource: "*"
+#      Roles:  
+#      - !Ref RoleInstance
+
+  ProfileInstance:  
+    Type: AWS::IAM::InstanceProfile  
+    Properties:  
+      Roles:  
+      - !Ref RoleInstance
+
+Outputs:
+  SgAlb:
+    Value: !Ref SgAlb
+    Export:
+      Name: !Sub ${AWS::StackName}-SgAlb
+  SgEndpoint:
+    Value: !Ref SgEndpoint
+    Export:
+      Name: !Sub ${AWS::StackName}-SgEndpoint
+  SgInstance:
+    Value: !Ref SgInstance
+    Export:
+      Name: !Sub ${AWS::StackName}-SgInstance
+  SgRds:
+    Value: !Ref SgRds
+    Export:
+      Name: !Sub ${AWS::StackName}-SgRds
+  ProfileInstance:
+    Value: !Ref ProfileInstance
+    Export:
+      Name: !Sub ${AWS::StackName}-ProfileInstance
